@@ -6,3 +6,5 @@ class RequestType(Enum):
     FILE_LIST = 2
     FILE_LOCATIONS = 3
     CHUNK_REGISTER = 4
+    CHUNK_DOWNLOAD = 5
+

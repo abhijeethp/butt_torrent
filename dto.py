@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from request_type import RequestType
 
+
 @dataclass
 class Req:
     type: int
@@ -10,6 +11,7 @@ class Req:
 class Resp:
     status: int
 
+
 @dataclass
 class RegisterReq(Req):
     type: int = field(default=RequestType.REGISTER.value, init=False)
@@ -17,10 +19,10 @@ class RegisterReq(Req):
     files: list
 
 
-
 @dataclass
 class RegisterResp(Resp):
     pass
+
 
 @dataclass
 class FileListReq(Req):
@@ -40,7 +42,7 @@ class FileLocationsReq(Req):
 
 @dataclass
 class FileLocationsResp(Resp):
-    endpoints: list
+    endpoints: dict
 
 
 @dataclass
@@ -54,3 +56,10 @@ class ChunkRegisterReq(Req):
 @dataclass
 class ChunkRegisterResp(Resp):
     pass
+
+
+@dataclass
+class ChunkDownloadReq(Req):
+    type: int = field(default=RequestType.CHUNK_DOWNLOAD.value, init=False)
+    file_name: str
+    chunk: int

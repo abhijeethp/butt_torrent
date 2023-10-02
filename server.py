@@ -14,13 +14,38 @@ from dto import ChunkRegisterReq, ChunkRegisterResp
 
 
 class Server:
-    def __init__(self, host: str, port: int):
+
+    # TODO: close the connection that i am opening here
+    def __init__(self):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.host, self.port = host, port
-        self.s.bind((host, port))
+        self.s.bind((SERVER_HOST, SERVER_PORT))
         self.s.listen(5)
 
         self.file_info = {}
+        threading.Thread(target=self.run).start()
+
+    def run(self):
+        print(f"Server running on {SERVER_HOST}:{SERVER_PORT}")
+        while True:
+            conn, addr = self.s.accept()
+            threading.Thread(target=self.handle_request, args=(conn,)).start()
+
+    def handle_request(self, conn):
+        data = conn.recv(BUFFER_SIZE).decode()
+        req = json.loads(data)
+        request_type = RequestType(req.pop('type'))
+
+        handlers = {
+            RequestType.REGISTER: self.register,
+            RequestType.FILE_LIST: self.file_list,
+            RequestType.FILE_LOCATIONS: self.file_locations,
+            RequestType.CHUNK_REGISTER: self.register_chunk
+        }
+
+        response = handlers[request_type](req)
+
+        conn.send(json.dumps(asdict(response)).encode())
+        conn.close()
 
     def register(self, req) -> RegisterResp:
         req = RegisterReq(**req)
@@ -63,31 +88,3 @@ class Server:
 
         print(f"Registered : Chunk {chunk} of file {file_name} present with {host}:{port}")
         return ChunkRegisterResp(status=SUCCESS)
-
-    def socket_target(self, conn):
-        data = conn.recv(BUFFER_SIZE).decode()
-        req = json.loads(data)
-        request_type = RequestType(req.pop('type'))
-
-        handlers = {
-            RequestType.REGISTER: self.register,
-            RequestType.FILE_LIST: self.file_list,
-            RequestType.FILE_LOCATIONS: self.file_locations,
-            RequestType.CHUNK_REGISTER: self.register_chunk
-        }
-
-        response = handlers[request_type](req)
-
-        conn.send(json.dumps(asdict(response)).encode())
-        conn.close()
-
-    def run(self):
-        print(f"Server running on {SERVER_HOST}:{SERVER_PORT}")
-        while True:
-            conn, addr = self.s.accept()
-            threading.Thread(target=self.socket_target, args=(conn,)).start()
-
-
-if __name__ == "__main__":
-    server = Server(SERVER_HOST, SERVER_PORT)
-    server.run()
