@@ -77,9 +77,10 @@ class Server:
         req = ChunkRegisterReq(**req)
 
         host, port = req.endpoint
-        file_name= req.file_name
+        file_name = req.file_name
         chunk = req.chunk
 
+        self.file_info[file_name]["chunks"].setdefault(f"{host}:{port}", [])
         existing_chunks = self.file_info[file_name]["chunks"][f"{host}:{port}"]
         existing_chunks = set(existing_chunks)
         existing_chunks.add(chunk)
@@ -88,3 +89,6 @@ class Server:
 
         print(f"Registered : Chunk {chunk} of file {file_name} present with {host}:{port}")
         return ChunkRegisterResp(status=SUCCESS)
+
+if __name__ == '__main__':
+    s = Server()

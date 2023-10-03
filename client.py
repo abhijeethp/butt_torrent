@@ -1,4 +1,5 @@
 import socket
+from collections import Counter
 import json
 import threading
 from dataclasses import asdict
@@ -17,7 +18,7 @@ def find_unused_port(start=CLIENT_PORT_START, end=9998):
     for port in range(start, end + 1):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
-                s.bind(('127.0.0.1', port))
+                s.bind((SERVER_HOST, port))
                 return port
             except OSError:
                 pass
@@ -91,15 +92,40 @@ class Client:
         response = ChunkRegisterResp(**response)
         print(response.status)
 
-    # TODO: complete this!
     def download_file(self, file_name):
         print(f"Downloading file {file_name}")
+
         files = self.file_list().files
         file_length = next((f['length'] for f in files if f['name'] == file_name), None)
         self.create_empty_file(file_name, file_length)
+        file_locations = self.file_locations(file_name).endpoints
 
-        file_locations = self.file_locations(file_name)
-        # TODO - uses rarest find and parallelise chunk downloads
+        chunk_counts = Counter(chunk for chunks in file_locations.values() for chunk in chunks)
+        rarest_chunks = sorted(chunk_counts, key=chunk_counts.get)
+
+        concurrency_limit = 4
+        semaphore = threading.Semaphore(concurrency_limit)
+
+        def download_with_semaphore(from_endpoint, file_name, chunk):
+            with semaphore:
+                self.download_chunk(from_endpoint, file_name, chunk)
+
+        threads = []
+        for chunk in rarest_chunks:
+            peer = next(peer for peer, chunks in file_locations.items() if chunk in chunks)
+            from_host, from_port = peer.split(":")
+            from_endpoint = (from_host, int(from_port))
+
+            task = threading.Thread(target=download_with_semaphore, args=(from_endpoint, file_name, chunk))
+            threads.append(task)
+
+        for task in threads:
+            task.start()
+
+        for task in threads:
+            task.join()
+
+        print(f"File {file_name} downloaded successfully.")
 
     def create_empty_file(self, file_name, length):
         file_path = os.path.join(self.mount_dir, file_name)
