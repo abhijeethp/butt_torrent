@@ -16,3 +16,6 @@ cat > storage/disk_1/file_4.svg <<EOF
 </svg>
 EOF
 cp init_storage/image_* storage/disk_1/
+
+rm -rf logs
+mkdir logs

@@ -16,7 +16,9 @@ class ClientCLI:
         while True:
             print("\nOptions:", *(f"{k}. {v[0]}" for k, v in self.menu_options.items()), sep="\n")
             choice = input("Enter choice: ")
-            self.menu_options.get(choice, (None, lambda: print("Invalid choice!")))[1]()
+            menu_option = self.menu_options.get(choice, (None, lambda: print("Invalid choice!")))
+            handler = menu_option[1]
+            handler()
 
     def list_files(self):
         resp = self.client.file_list()

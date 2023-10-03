@@ -43,6 +43,7 @@ class FileLocationsReq(Req):
 @dataclass
 class FileLocationsResp(Resp):
     endpoints: dict
+    hashes: list
 
 
 @dataclass

@@ -51,14 +51,21 @@ class Server:
         req = RegisterReq(**req)
         host, port = req.endpoint
 
-        for file_meta in req.files:
-            name, length = file_meta["name"], file_meta["length"]
+        for file in req.files:
+            name, length, hashes = file["name"], file["length"], file["hashes"]
             num_chunks = -(-length // CHUNK_SIZE)
+            chunks = list(range(num_chunks))
+
+            if name in self.file_info:
+                self.file_info[name]["chunks"] = {f"{host}:{port}": chunks}
+                continue
+
             self.file_info[name] = {
                 "length": length,
-                "chunks": {f"{host}:{port}": list(range(num_chunks))}
+                "chunks": {f"{host}:{port}": chunks},
+                "hashes": hashes
             }
-            print(f"Registered : {name}({length}): -> {host}:{port} -> {list(range(num_chunks))}")
+            print(f"Registered : {name}({length}): -> {host}:{port}")
         return RegisterResp(status=SUCCESS)
 
     def file_list(self, req) -> FileListResp:
@@ -71,7 +78,8 @@ class Server:
         req = FileLocationsReq(**req)
         file_name = req.file_name
         endpoints = self.file_info[file_name]["chunks"]
-        return FileLocationsResp(status=SUCCESS, endpoints=endpoints)
+        hashes = self.file_info[file_name]["hashes"]
+        return FileLocationsResp(status=SUCCESS, endpoints=endpoints, hashes=hashes)
 
     def register_chunk(self, req) -> ChunkRegisterResp:
         req = ChunkRegisterReq(**req)
