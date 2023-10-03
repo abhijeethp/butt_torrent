@@ -3,6 +3,8 @@ from collections import Counter
 import json
 import threading
 from dataclasses import asdict
+import time
+import random
 import os
 
 from constants import BUFFER_SIZE, SERVER_HOST, SERVER_PORT, CLIENT_PORT_START, CHUNK_SIZE
@@ -39,10 +41,11 @@ class Client:
 
         self.mount_dir = f"storage/{dir_name}"
         self.mount()
+        self.download_progress = {}
 
 
     def run(self):
-        print(f"Client running on {self.endpoint[0]}:{self.endpoint[1]}")
+        self.log(f"Client running on {self.endpoint[0]}:{self.endpoint[1]}")
         while True:
             conn, addr = self.s.accept()
             threading.Thread(target=self.handle_request, args=(conn,)).start()
@@ -60,7 +63,7 @@ class Client:
         conn.close()
 
     def mount(self):
-        print(f"Mounted {self.mount_dir}")
+        self.log(f"Mounted {self.mount_dir}")
         file_names = os.listdir(self.mount_dir)
         file_paths = [os.path.join(self.mount_dir, f) for f in file_names]
 
@@ -73,30 +76,32 @@ class Client:
     def register(self, files):
         resp = self.request_server(RegisterReq(endpoint=self.endpoint, files=files))
         resp = RegisterResp(**resp)
-        print(resp.status)
+        self.log(resp.status)
 
     def file_list(self):
         resp = self.request_server(FileListReq())
         resp = FileListResp(**resp)
-        print(resp.status,",",resp.files)
+        self.log(resp.status,",",resp.files)
         return resp
 
     def file_locations(self, file_name) -> FileLocationsResp:
         resp = self.request_server(FileLocationsReq(file_name=file_name))
         resp = FileLocationsResp(**resp)
-        print(resp.status,",",resp.endpoints)
+        self.log(resp.status,",",resp.endpoints)
         return resp
 
     def register_chunk(self, file_name, chunk):
         response = self.request_server(ChunkRegisterReq(endpoint=self.endpoint, file_name=file_name, chunk=chunk))
         response = ChunkRegisterResp(**response)
-        print(response.status)
+        self.log(response.status)
 
     def download_file(self, file_name):
-        print(f"Downloading file {file_name}")
+        self.log(f"Downloading file {file_name}")
 
         files = self.file_list().files
         file_length = next((f['length'] for f in files if f['name'] == file_name), None)
+        num_chunks = -(-file_length // CHUNK_SIZE)
+        self.download_progress[file_name] = {'downloaded': 0, 'total': num_chunks}
         self.create_empty_file(file_name, file_length)
         file_locations = self.file_locations(file_name).endpoints
 
@@ -125,7 +130,7 @@ class Client:
         for task in threads:
             task.join()
 
-        print(f"File {file_name} downloaded successfully.")
+        self.log(f"File {file_name} downloaded successfully.")
 
     def create_empty_file(self, file_name, length):
         file_path = os.path.join(self.mount_dir, file_name)
@@ -141,7 +146,16 @@ class Client:
             file.seek(chunk * CHUNK_SIZE)
             file.write(chunk_data)
 
+        # NOTE: Below sleep is for simulation purposes only..... will not be required in real life!!
+        time.sleep(random.uniform(0, 1))
+
         self.register_chunk(file_name, chunk)
+        self.download_progress[file_name]['downloaded'] += 1
+
+    def get_download_progress(self, file_name):
+        progress = self.download_progress.get(file_name)
+        prcnt = round((progress['downloaded'] / progress['total']) * 100, 2)
+        return prcnt
 
     def upload_chunk(self, conn, req):
         req = ChunkDownloadReq(**req)
@@ -163,3 +177,6 @@ class Client:
             response_data = s.recv(BUFFER_SIZE)
             return response_data
 
+    def log(self, *args):
+        # print(args)
+        return
